@@ -12,7 +12,7 @@ redis_connection = redis.StrictRedis("localhost", 6379)
 
 def hash(url):
   hashed = b64encode(md5(url.encode(encoding='UTF-8',errors='strict')).digest())
-  return hashed[:6].replace('/', '_')
+  return hashed[:16].replace('/', '_')
 
 
 @app.route('/', methods=['POST'])
