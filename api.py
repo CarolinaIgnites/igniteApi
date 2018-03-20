@@ -1,7 +1,8 @@
-from flask import Flask, request, jsonify
-from base64 import base64encode
-from hashlib import md5
+#!/usr/bin/python
 
+from flask import Flask, request, jsonify
+from base64 import b64encode
+from hashlib import md5
 import redis
 
 
@@ -27,6 +28,5 @@ def get_long_url(lookup):
   data = redis_connection.get(lookup)
   return jsonify({'valid': data is not None, 'data': data})
 
-if __name__ == "__main__":
-    app.debug = True
-    app.run()
+
+app.run()
