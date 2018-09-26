@@ -1,14 +1,10 @@
 #!/usr/bin/python
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from base64 import b64encode
 from hashlib import md5
 import redis
 import requests
-
-from flask import Response
-from flask import stream_with_context
-
 
 app = Flask(__name__)
 redis_connection = redis.StrictRedis("localhost", 6379)
@@ -34,10 +30,11 @@ def get_long_url(lookup):
 
 @app.route('/cors/<path:url>')
 def proxy(url):
-    headers = {'Access-Control-Allow-Origin' : '*'}
-    resp = requests.get(url, headers = headers)
-    print(resp.headers)
-    return Response(stream_with_context(resp.iter_content()), content_type = resp.headers['content-type'])
+    req = requests.get(url)
+    response = Response(stream_with_context(req.iter_content()), content_type = req.headers['content-type'])
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    print(response.headers)
+    return response
 
 
 app.run()
