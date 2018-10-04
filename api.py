@@ -36,7 +36,8 @@ def get_long_url(lookup):
 def proxy(url):
     req = requests.get(url)
     response = Response(stream_with_context(req.iter_content()), content_type = req.headers['content-type'])
-   # response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Origin'] = '*'
     print(response.headers)
     return response
+
 app.run()
