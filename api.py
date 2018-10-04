@@ -6,10 +6,6 @@ from hashlib import md5
 import redis
 import requests
 
-from flask import Response
-from flask import stream_with_context
-
-
 app = Flask(__name__)
 redis_connection = redis.StrictRedis("localhost", 6379)
 
