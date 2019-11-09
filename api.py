@@ -11,7 +11,8 @@ from redis_lru import redis_lru_cache
 from redisearch import Client, TextField, NumericField, Query
 
 import requests
-from gzipped import gzipped from PIL import Image, ImageOps 
+from gzipped import gzipped
+from PIL import Image, ImageOps 
 import os
 
 
@@ -22,7 +23,8 @@ redis_connection = redis.StrictRedis("localhost", 6379)
 client = Client('published')
 PUBLISH_KEY = os.getenv('PUBLISH_KEY', "key that is def set, so dont try it")
 # This index already exists, and must be made
-# client.create_index([TextField('title', weight=5.0), TextField('description')])
+#client.drop_index()
+#client.create_index([TextField('title', weight=5.0), TextField('description', weight=2.0), NumericField('favs'), NumericField('highscore'), TextField('match')])
 
 
 def hash(url):
@@ -31,10 +33,10 @@ def hash(url):
 
 
 def serve_pil_image(pil_img):
-    img_io = io.BytesIO()
-    pil_img.save(img_io, 'PNG')
-    img_io.seek(0)
-    return send_file(img_io, mimetype='image/png')
+  img_io = io.BytesIO()
+  pil_img.save(img_io, 'PNG')
+  img_io.seek(0)
+  return send_file(img_io, mimetype='image/png')
 
 
 @app.route('/', methods=['POST'])
@@ -116,7 +118,7 @@ def publish(publish_key, lookup):
   title = data.get("meta",{}).get("name", "No title")
   description = data.get("meta",{}).get("instructions", "No description")
   lookup = "published_" + lookup.strip()
-  client.add_document(lookup, payload=src, title=title, body=description)
+  client.add_document(lookup, payload=src, title=title, body=description, favs=0, highscore=0, match="*")
   return "Success!"
 
 
@@ -130,7 +132,16 @@ def unpublish(publish_key, lookup):
 @app.route('/search')
 def search():
   query = request.args.get("search")
-  res = client.search(Query(query).with_payloads())
+  res = client.search(Query(query).limit_fields('title', 'body').with_payloads())
+  return jsonify({
+    "results": [doc.__dict__ for doc in res.docs],
+    "total": res.total
+  })
+
+
+@app.route('/some')
+def some():
+  res = client.search(Query("*").limit_fields('match').paging(0, 5).with_payloads())
   return jsonify({
     "results": [doc.__dict__ for doc in res.docs],
     "total": res.total
