@@ -1,0 +1,42 @@
+{
+    "short_name": "{{name}}",
+    "name": "GameFrame: {{name}}",
+    "icons": [
+    {
+        "src": "/app/{{lookup}}/48.png",
+        "type": "image/png",
+        "sizes": "48x48"
+    }, 
+
+    {
+        "src": "/app/{{lookup}}/72.png",
+        "type": "image/png",
+        "sizes": "72x72"
+    }, 
+    {
+        "src": "/app/{{lookup}}/96.png",
+        "type": "image/png",
+        "sizes": "96x96"
+    }, 
+    {
+        "src": "/app/{{lookup}}/144.png",
+        "type": "image/png",
+        "sizes": "144x144"
+    }, 
+    {
+        "src": "/app/{{lookup}}/192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+    }, 
+    {
+        "src": "/app/{{lookup}}/512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+    }],
+    "start_url": "/app/{{lookup}}/",
+    "scope": "/app/{{lookup}}/",
+    "display": "standalone",
+    "orientation": "landscape",
+    "background_color": "#AAAAAA",
+    "theme_color": "#EEEEEE"
+}
