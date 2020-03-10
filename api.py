@@ -5,6 +5,8 @@ from base64 import b64encode, b64decode
 from hashlib import md5
 import json
 import io
+import string
+import random
 
 import redis
 from redis_lru import RedisLRU
@@ -32,9 +34,20 @@ PUBLISH_KEY = os.getenv('PUBLISH_KEY', "key that is def set, so dont try it")
 #client.create_index([TextField('title', weight=5.0), TextField('description', weight=2.0), NumericField('favs'), NumericField('highscore'), TextField('match')])
 
 
-def hash(url):
-  hashed = b64encode(md5(url.encode(encoding='UTF-8',errors='strict')).digest())
-  return hashed[:16].replace(b'/', b'_').decode("utf-8")
+def hasher(url, lookup, recursed=False):
+  if not recursed and len(lookup) > 16 and redis_connection.get(lookup) is not None:
+    splits = lookup.split("-")
+    return splits[0] + "-" + str(int(splits[-1]) + 1)
+  seed = b64encode(md5(url.encode(encoding='UTF-8', errors='strict')).digest())
+  random.seed(seed[:32])
+  # Gives us a cleaner string than a b64
+  hashed = ''.join(random.choice(string.ascii_lowercase +
+      string.ascii_uppercase + string.digits) for _ in range(16))
+  data = redis_connection.get("count_" + hashed)
+  if data is not None:
+    return hasher(url + hashed, lookup, True)
+  redis_connection.set("count_" + hashed, '1', nx=True)
+  return hashed + "-0"
 
 
 def serve_pil_image(pil_img):
@@ -56,7 +69,7 @@ def change_fav(lookup, delta):
 def create_short_url():
   # TODO: Add CSRF tokens
   data = request.form['data']
-  lookup = hash(data)
+  lookup = hasher(data, request.form['hash'][1:])
   redis_connection.set(lookup, data, nx=True)
   return jsonify({'lookup':lookup})
 
