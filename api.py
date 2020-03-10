@@ -35,19 +35,32 @@ PUBLISH_KEY = os.getenv('PUBLISH_KEY', "key that is def set, so dont try it")
 
 
 def hasher(url, lookup, recursed=False):
-  if not recursed and len(lookup) > 16 and redis_connection.get(lookup) is not None:
-    splits = lookup.split("-")
-    return splits[0] + "-" + str(int(splits[-1]) + 1)
   seed = b64encode(md5(url.encode(encoding='UTF-8', errors='strict')).digest())
   random.seed(seed[:32])
-  # Gives us a cleaner string than a b64
+  # Gives us a cleaner string than a b64 (also more random)
   hashed = ''.join(random.choice(string.ascii_lowercase +
       string.ascii_uppercase + string.digits) for _ in range(16))
+
+  # Do not update if nothing has changed.
+  if not recursed and len(lookup) > 16 and redis_connection.get(lookup) is not None:
+    splits = lookup.split("-")
+    if redis_connection.get("prev_" + lookup).decode("utf-8") != hashed:
+        # Increment the inital hash by 1. In theory increment is atomic and
+        # this should be race-condition safe.
+        lookup = splits[0] + "-" + str(redis_connection.incr("count_" + splits[0]))
+        redis_connection.set("prev_" + lookup, hashed)
+    return lookup
+
+  # Change to see if somehow we have a hash collision. This is laughably
+  # unlikely normally, but we offer the option to generate a new link. A new
+  # link means a new context and should have a new hash.
   data = redis_connection.get("count_" + hashed)
   if data is not None:
     return hasher(url + hashed, lookup, True)
-  redis_connection.set("count_" + hashed, '1', nx=True)
-  return hashed + "-0"
+  redis_connection.incr("count_" + hashed)
+  lookup = hashed + "-0"
+  redis_connection.set("prev_" + lookup, hashed)
+  return lookup
 
 
 def serve_pil_image(pil_img):
