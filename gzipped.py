@@ -1,5 +1,5 @@
 from flask import after_this_request, request
-from cStringIO import StringIO as IO
+from io import BytesIO as IO
 import gzip
 import functools 
 

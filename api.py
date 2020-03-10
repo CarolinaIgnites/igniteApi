@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from flask import Flask, request, jsonify, Response, stream_with_context, render_template, send_file
 from base64 import b64encode, b64decode
@@ -7,7 +7,7 @@ import json
 import io
 
 import redis
-from redis_lru import redis_lru_cache
+from redis_lru import RedisLRU
 from redisearch import Client, TextField, NumericField, Query
 
 import requests
@@ -15,9 +15,14 @@ from gzipped import gzipped
 from PIL import Image, ImageOps 
 import os
 
+from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
+# CORS(app)
+
 redis_connection = redis.StrictRedis("localhost", 6379)
+
+cache = RedisLRU(redis_connection, max_size=512)
 
 # For searching
 client = Client('published')
@@ -29,7 +34,7 @@ PUBLISH_KEY = os.getenv('PUBLISH_KEY', "key that is def set, so dont try it")
 
 def hash(url):
   hashed = b64encode(md5(url.encode(encoding='UTF-8',errors='strict')).digest())
-  return hashed[:16].replace('/', '_')
+  return hashed[:16].replace(b'/', b'_').decode("utf-8")
 
 
 def serve_pil_image(pil_img):
@@ -37,6 +42,14 @@ def serve_pil_image(pil_img):
   pil_img.save(img_io, 'PNG')
   img_io.seek(0)
   return send_file(img_io, mimetype='image/png')
+
+
+def change_fav(lookup, delta):
+  doc = client.load_document(lookup)
+  doc.favs += delta
+  doc.favs = min(doc.favs, 0)
+  client.add_document(lookup, partial=True, favs=doc.favs)
+  return 202
 
 
 @app.route('/', methods=['POST'])
@@ -51,7 +64,9 @@ def create_short_url():
 @app.route('/<string:lookup>')
 def get_long_url(lookup):
   data = redis_connection.get(lookup)
-  return jsonify({'valid': data is not None, 'data': data})
+  if data is not None:
+    return jsonify({'valid': True, 'data': data.decode("utf-8")})
+  return jsonify({'valid': False, 'data': None})
 
 
 @app.route('/app/<string:lookup>/')
@@ -62,7 +77,7 @@ def get_app(lookup):
 @app.route('/app/<string:lookup>/manifest.json')
 def get_manifest(lookup):
   data = redis_connection.get(lookup)
-  data = json.loads(b64decode(data))
+  data = json.loads(b64decode(data).decode("utf-8"))
   name = data.get("meta",{}).get("name", "GameFrame")
   response = render_template('manifest.json', lookup=lookup, name=name)
   return Response(response, mimetype='application/javascript')
@@ -71,9 +86,8 @@ def get_manifest(lookup):
 @app.route('/app/<string:lookup>/<int:size>.png')
 def get_icon(lookup, size):
   data = redis_connection.get(lookup)
-  data = json.loads(b64decode(data))
+  data = json.loads(b64decode(data).decode("utf-8"))
   src = data.get("meta",{}).get("icon", "https://editor.carolinaignites.org/launcher-icon-4x.png")
-
   img, content_type = get_image(src)
   img = Image.open(io.BytesIO(img))
   img = ImageOps.fit(img, (size, size,), method=Image.ANTIALIAS)
@@ -83,13 +97,13 @@ def get_icon(lookup, size):
 @app.route('/app/<string:lookup>/sw.js')
 def get_sw(lookup):
   data = redis_connection.get(lookup)
-  data = json.loads(b64decode(data))
+  data = json.loads(b64decode(data).decode("utf-8"))
   name = data.get("meta",{}).get("name", "GameFrame")
   response = render_template('sw.js', lookup=lookup, name=name)
   return Response(response, mimetype='application/javascript')
 
 
-@redis_lru_cache(max_size=256, node=redis_connection)
+@cache
 def get_image(url):
   req = requests.get(url)
   return req.content, req.headers.get('content-type') 
@@ -98,10 +112,11 @@ def get_image(url):
 @app.route('/cors/<path:url>')
 @gzipped
 def proxy(url):
-  data, content_type = get_image(url + "?" + request.query_string)
+  data, content_type = get_image(url + "?" + request.query_string.decode("utf-8"))
   response = Response(data, content_type=content_type)
   del response.headers['Access-Control-Allow-Origin']
   response.headers['x-requested-with'] = 'ignite-api'
+  response.cache_control.max_age = 31536000
   return response
 
 
@@ -113,7 +128,7 @@ def publish(publish_key, lookup):
   if data is None:
     return "Bad lookup hash"
 
-  data = json.loads(b64decode(data))
+  data = json.loads(b64decode(data).decode('utf-8'))
   src = data.get("meta",{}).get("icon", "https://editor.carolinaignites.org/launcher-icon-4x.png")
   title = data.get("meta",{}).get("name", "No title")
   description = data.get("meta",{}).get("instructions", "No description")
@@ -129,9 +144,26 @@ def unpublish(publish_key, lookup):
   return ["Didn't work", "Worked"][client.delete_document("published_" +lookup)]
 
 
+@app.route('/unfav/<string:lookup>')
+def unfav(lookup):
+  return change_fav(lookup, -1)
+
+@app.route('/fav/<string:lookup>')
+def fav(lookup):
+  return change_fav(lookup, 1)
+
+@app.route('/highscore/<string:lookup>/<int:score>')
+def highscore(lookup, score):
+  client.load_document(lookup)
+  if score > lookup.highscore:
+    client.add_document(lookup, partial=True, favs=score)
+    return 202
+  return 406
+
+
 @app.route('/search')
 def search():
-  query = request.args.get("search")
+  query = request.args.get("search") + "*"
   res = client.search(Query(query).limit_fields('title', 'body').with_payloads())
   return jsonify({
     "results": [doc.__dict__ for doc in res.docs],
@@ -139,13 +171,16 @@ def search():
   })
 
 
-@app.route('/some')
-def some():
-  res = client.search(Query("*").limit_fields('match').paging(0, 5).with_payloads())
+@app.route('/some/<int:page>')
+def some(page):
+  res = client.search(Query("*").limit_fields('match').paging(page, 5).with_payloads())
   return jsonify({
     "results": [doc.__dict__ for doc in res.docs],
     "total": res.total
   })
 
+@app.route('/some')
+def some0():
+    return some(0)
 
 app.run()
