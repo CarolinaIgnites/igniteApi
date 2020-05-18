@@ -209,4 +209,12 @@ def some(page):
 def some0():
     return some(0)
 
+@app.route('/apple-app-site-association')
+def getJSON():
+    try:
+        return send_file('./apple-app-site-association')
+    except Exception as e:
+    	return str(e)
+
+
 app.run()
