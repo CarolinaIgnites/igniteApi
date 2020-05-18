@@ -143,15 +143,22 @@ def get_details(lookup):
 
 @cache
 def get_image(url):
-  req = requests.get(url)
-  return req.content, req.headers.get('content-type') 
+  try:
+    req = requests.get(url)
+    return req.content, req.headers.get('content-type') 
+  except:
+    return "", ""
 
 
 @app.route('/cors/<path:url>')
 @gzipped
 def proxy(url):
   data, content_type = get_image(url + "?" + request.query_string.decode("utf-8"))
-  response = Response(data, content_type=content_type)
+  if data == "":
+    response = Response("", status=415)
+  else:
+    response = Response(data, content_type=content_type)
+
   del response.headers['Access-Control-Allow-Origin']
   response.headers['x-requested-with'] = 'ignite-api'
   response.cache_control.max_age = 31536000
@@ -221,6 +228,14 @@ def some(page):
 def some0():
     return some(0)
 
+@app.route('/published')
+def get_published():
+  res = client.search(Query("*").limit_fields('id'))
+  return jsonify({
+    "results": [doc.id for doc in res.docs],
+    "total": res.total
+  })
+
 @app.route('/apple-app-site-association')
 def getJSON():
     try:
@@ -231,3 +246,6 @@ def getJSON():
 
 if __name__ == "__main__":
     app.run()
+else:
+    # for gunicorn to work properly
+    application = app
