@@ -128,6 +128,18 @@ def get_sw(lookup):
   response = render_template('sw.js', lookup=lookup, name=name)
   return Response(response, mimetype='application/javascript')
 
+@app.route('/d/<string:lookup>')
+def get_details(lookup):
+  dump = redis_connection.get(lookup)
+  data = json.loads(b64decode(dump).decode("utf-8"))
+  name = data.get("meta",{}).get("name", "Untitled Game")
+  instructions  = data.get("meta",{}).get("instructions", "No instructions.")
+  return jsonify({
+      'valid': True,
+      'title': name,
+      'instructions': instructions,
+      'json': dump.decode("utf-8")
+      })
 
 @cache
 def get_image(url):
@@ -212,9 +224,10 @@ def some0():
 @app.route('/apple-app-site-association')
 def getJSON():
     try:
-        return send_file('./apple-app-site-association')
+        print("asdf");
+        return send_file('./apple-app-site-association', attachment_filename='apple-app-site-association')
     except Exception as e:
     	return str(e)
 
-
-app.run()
+if __name__ == "__main__":
+    app.run()

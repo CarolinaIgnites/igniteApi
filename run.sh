@@ -1,3 +1,3 @@
 #!/bin/bash
-
-gunicorn --bind :8080 api --daemon
+fuser -k 5000/tcp
+gunicorn --bind :5000 api --daemon
