@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 from flask import Flask, request, jsonify, Response, stream_with_context, render_template, send_file
 from base64 import b64encode, b64decode
@@ -14,7 +14,7 @@ from redisearch import Client, TextField, NumericField, Query
 
 import requests
 from gzipped import gzipped
-from PIL import Image, ImageOps 
+from PIL import Image, ImageOps
 import os
 
 from flask_cors import CORS, cross_origin
@@ -117,7 +117,7 @@ def get_icon(lookup, size):
   img, content_type = get_image(src)
   img = Image.open(io.BytesIO(img))
   img = ImageOps.fit(img, (size, size,), method=Image.ANTIALIAS)
-  return serve_pil_image(img) 
+  return serve_pil_image(img)
 
 
 @app.route('/app/<string:lookup>/sw.js')
@@ -145,7 +145,7 @@ def get_details(lookup):
 def get_image(url):
   try:
     req = requests.get(url)
-    return req.content, req.headers.get('content-type') 
+    return req.content, req.headers.get('content-type')
   except:
     return "", ""
 
@@ -239,10 +239,9 @@ def get_published():
 @app.route('/apple-app-site-association')
 def getJSON():
     try:
-        print("asdf");
         return send_file('./apple-app-site-association', attachment_filename='apple-app-site-association')
     except Exception as e:
-    	return str(e)
+      return str(e)
 
 if __name__ == "__main__":
     app.run()
