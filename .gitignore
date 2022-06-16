@@ -1,1 +1,3 @@
 *.pyc
+result
+igniteapi/__pycache__

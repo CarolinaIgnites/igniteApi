@@ -23,8 +23,16 @@
         };
         # app requirements
         dependencies = [
+          pkgs.python39Packages.gunicorn
           pythonBuild
+          pkgs.redis
         ];
+        api = mach-nix-wrapper.buildPythonApplication {
+          pname = "api.py";
+          version = "1.0.0";
+          src = ./.;
+          requirements = requirements;
+        };
       in
       {
         devShell = pkgs.mkShell {
@@ -36,9 +44,21 @@
           ];
           packages = dependencies ++ [
             # Whatever else we may need to debug
-            pkgs.redis
           ];
         };
-        defaultPackage = mach-nix-wrapper.buildPythonApplication ./.;
+        defaultPackage = (pkgs.runCommand "igniteapi"
+          {
+            passAsFile = [ "text" ];
+            preferLocalBuild = true;
+            allowSubstitutes = false;
+          } ''
+          target=$out/bin/igniteapi
+          mkdir -p "$(dirname "$target")"
+          echo -n "source <(head -n-1 ${api}/bin/api.py)" > "$target"
+          gunicorn=${pkgs.python39Packages.gunicorn}/bin/gunicorn
+          cp ${api}/bin/.api.py-wrapped $out/api.py
+          echo -n "$gunicorn --bind :5000 api --chdir $out/" > "$target"
+          chmod +x "$target"
+        '');
       });
 }

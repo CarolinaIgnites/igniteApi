@@ -13,7 +13,7 @@ from redis_lru import RedisLRU
 from redisearch import Client, TextField, NumericField, Query
 
 import requests
-from gzipped import gzipped
+from igniteapi.gzipped import gzipped
 from PIL import Image, ImageOps
 import os
 
