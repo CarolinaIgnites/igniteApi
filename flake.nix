@@ -54,10 +54,11 @@
           } ''
           target=$out/bin/igniteapi
           mkdir -p "$(dirname "$target")"
-          echo -n "source <(head -n-1 ${api}/bin/api.py)" > "$target"
+          echo "#!/usr/bin/env ${pkgs.bash}/bin/bash" >> "$target"
+          # echo "source <(head -n-1 ${api}/bin/api.py)" >> "$target"
           gunicorn=${pkgs.python39Packages.gunicorn}/bin/gunicorn
           cp ${api}/bin/.api.py-wrapped $out/api.py
-          echo -n "$gunicorn --bind :5000 api --chdir $out/" > "$target"
+          echo "$gunicorn --bind :5000 api --chdir $out/" >> "$target"
           chmod +x "$target"
         '');
       });
