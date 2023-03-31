@@ -9,7 +9,7 @@ gunicorn==20.0.4
 hiredis==1.0.1
 itsdangerous==1.1.0
 redis-lru==0.1.0
-redis==4.5.3
+redis==4.5.4
 redisearch==0.9.0
 requests
 rmtest==0.7.0
